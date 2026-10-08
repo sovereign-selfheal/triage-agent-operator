@@ -1,0 +1,177 @@
+# CustomResourceDefinition for TriageAgent. Cluster-scoped: installed by the `ansible`
+# repo (see AGENTS.md section 2 of the gitops repo — this repo never installs CRDs or
+# cluster-scoped objects itself, it only defines the schema that ansible applies).
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: triageagents.triage.sovereign-selfheal.io
+spec:
+  group: triage.sovereign-selfheal.io
+  scope: Namespaced
+  names:
+    kind: TriageAgent
+    listKind: TriageAgentList
+    plural: triageagents
+    singular: triageagent
+    shortNames:
+      - tagent
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Route
+          type: string
+          jsonPath: .status.routeUrl
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: >-
+            A dedicated triage-agent instance (Gradio UI + OGX sidecar) that troubleshoots
+            applications in its own namespace. One CR = one agent stack in that namespace.
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - router
+              properties:
+                image:
+                  type: string
+                  description: >-
+                    triage-agent image, pinned by digest. Defaults to the operator's
+                    built-in default when omitted.
+                ogxImage:
+                  type: string
+                  description: OGX sidecar image, pinned by digest.
+                replicas:
+                  type: integer
+                  minimum: 0
+                  default: 1
+                  description: >-
+                    Omit (or set via a separate HPA/KEDA object) when autoscaling owns
+                    replica count; the operator only writes this field once on create
+                    if it is set, and leaves it alone on update when unset.
+                router:
+                  type: object
+                  required:
+                    - url
+                  properties:
+                    url:
+                      type: string
+                      description: 'Platform gateway base URL, e.g. https://router.<appsDomain>/v1.'
+                    model:
+                      type: string
+                      default: auto
+                      description: Model alias of the router the agent calls.
+                    tlsVerify:
+                      type: boolean
+                      default: true
+                apiKey:
+                  type: object
+                  properties:
+                    tier:
+                      type: string
+                      default: agents
+                      description: >-
+                        Router token-budget tier (maas-group label). Must match one
+                        entry of the platform's tiers.
+                    prefix:
+                      type: string
+                      default: 'sk-'
+                    length:
+                      type: integer
+                      default: 40
+                    existingSecret:
+                      type: string
+                      description: >-
+                        Name of an existing Secret (key api_key) to mount instead of
+                        generating one. Skips Password/ExternalSecret creation.
+                mcpServers:
+                  type: object
+                  properties:
+                    prometheus:
+                      type: string
+                      description: 'Prometheus MCP server URL, e.g. http://prometheus-mcp-server.<ns>.svc:8080/mcp.'
+                    ticketing:
+                      type: string
+                      description: 'Ticketing MCP server URL.'
+                    ocp:
+                      type: string
+                      description: 'Optional Kubernetes-API MCP server URL.'
+                knowledge:
+                  type: object
+                  properties:
+                    configMapName:
+                      type: string
+                      description: >-
+                        Existing ConfigMap with a data key equal to fileName. Mutually
+                        exclusive with content.
+                    fileName:
+                      type: string
+                      default: knowledge.md
+                    mountPath:
+                      type: string
+                      default: /etc/triage-agent
+                    content:
+                      type: string
+                      description: >-
+                        Inline application knowledge. The operator creates and owns a
+                        ConfigMap from this content when configMapName is empty.
+                namespaceHint:
+                  type: boolean
+                  default: false
+                  description: Sets ROUTER_NAMESPACE_HINT (router namespace policy, v0.11.0+).
+                route:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: true
+                    host:
+                      type: string
+                      description: Optional explicit hostname; default is operator-assigned.
+                resources:
+                  type: object
+                  properties:
+                    agent:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    ogx:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum: ['Pending', 'Running', 'Degraded']
+                routeUrl:
+                  type: string
+                observedGeneration:
+                  type: integer
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time

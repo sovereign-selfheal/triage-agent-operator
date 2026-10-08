@@ -1,0 +1,25 @@
+name: lint
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dev dependencies
+        run: pip install --no-cache-dir -r requirements-dev.txt
+
+      - name: Run tests
+        run: pytest
+
+      - name: Build image (no push)
+        run: podman build -t localhost/triage-agent-operator:ci .

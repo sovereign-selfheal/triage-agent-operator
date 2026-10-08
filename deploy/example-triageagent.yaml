@@ -1,0 +1,38 @@
+# Example CR. Field defaults are applied by the operator (see app/config.py); a minimal
+# CR only needs metadata and spec.router.url.
+apiVersion: triage.sovereign-selfheal.io/v1alpha1
+kind: TriageAgent
+metadata:
+  name: triage-agent
+  namespace: agentic-triage
+spec:
+  image: quay.io/sovereign-selfheal/triage-agent@sha256:a8340b5c1b4006dc8418a8c2646caeaf03e3bb52bad41e2830895a32605b7781
+  ogxImage: docker.io/ogxai/distribution-starter@sha256:9d6afd54417bee1f37768a054e198becfadbed21d270d8ec1cdfb699e35e9924
+  replicas: 1
+  router:
+    url: https://router.apps.example.com/v1
+    model: auto
+    tlsVerify: true
+  apiKey:
+    tier: agents
+    prefix: 'sk-'
+    length: 40
+  mcpServers:
+    prometheus: http://prometheus-mcp-server.agentic-triage.svc:8080/mcp
+    ticketing: http://ticketing-mcp-server.agentic-triage.svc:8080/mcp
+  knowledge:
+    fileName: knowledge.md
+    mountPath: /etc/triage-agent
+    content: |
+      # Application Knowledge Base — quarkus-buggy-app
+      See the gitops repo components/triage-agent/files/knowledge.md for the full text.
+  namespaceHint: false
+  route:
+    enabled: true
+  resources:
+    agent:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { cpu: 500m, memory: 512Mi }
+    ogx:
+      requests: { cpu: 250m, memory: 512Mi }
+      limits: { cpu: '1', memory: 1Gi }
