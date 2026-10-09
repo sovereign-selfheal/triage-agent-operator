@@ -13,7 +13,8 @@ RUN useradd -u 1001 -r -g 0 -d /app -s /sbin/nologin appuser && \
 USER 1001
 
 ENV PYTHONUNBUFFERED=1 \
-    LOG_LEVEL=INFO
+    LOG_LEVEL=INFO \
+    PYTHONPATH=/app
 
 # Cluster-wide watch: the operator reconciles TriageAgent CRs in every namespace. The
 # ClusterRole/ClusterRoleBinding for its ServiceAccount is cluster-scoped and lives in

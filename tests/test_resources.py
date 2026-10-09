@@ -76,6 +76,16 @@ def test_apikey_secret_skipped_when_existing_secret_set(minimal_resolved_spec):
     assert resources.resolved_apikey_secret_name("triage-agent", spec) == "my-secret"
 
 
+def test_deployment_marks_knowledge_configmap_optional(minimal_resolved_spec):
+    # No `content` and no `configMapName`: build_knowledge_configmap() creates nothing,
+    # so the Deployment must not hard-depend on a ConfigMap that will never exist
+    # (otherwise the pod stays stuck in ContainerCreating forever).
+    deployment = resources.build_deployment("triage-agent", minimal_resolved_spec)
+
+    volumes = {v["name"]: v for v in deployment["spec"]["template"]["spec"]["volumes"]}
+    assert volumes["agent-knowledge"]["configMap"]["optional"] is True
+
+
 def test_deployment_has_two_containers_and_expected_env(minimal_resolved_spec):
     deployment = resources.build_deployment("triage-agent", minimal_resolved_spec)
 

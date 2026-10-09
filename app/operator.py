@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import os
 
 import kopf
 from kubernetes import client
@@ -49,8 +50,19 @@ def _api(api_version: str, kind: str):
 
 
 def _apply(api_version: str, kind: str, namespace: str, manifest: dict) -> None:
-    """Server-side apply of the full desired manifest (AGENTS.md section 3.3)."""
-    _api(api_version, kind).apply(body=manifest, namespace=namespace, field_manager=FIELD_MANAGER)
+    """Server-side apply of the full desired manifest (AGENTS.md section 3.3).
+
+    `kubernetes.dynamic.DynamicClient` (kubernetes>=30.1.0,<31, see requirements.txt)
+    has no `apply` method, only `server_side_apply`; using `.apply()` here raised
+    `AttributeError` on every reconcile (kopf swallowed it and retried forever, so the
+    pod stayed up with no child objects ever created).
+    """
+    _api(api_version, kind).server_side_apply(
+        body=manifest,
+        namespace=namespace,
+        field_manager=FIELD_MANAGER,
+        force_conflicts=True,
+    )
 
 
 def _get(api_version: str, kind: str, namespace: str, name: str):
@@ -73,7 +85,15 @@ def _existing_api_key(namespace: str, secret_name: str) -> str | None:
 
 @kopf.on.startup()
 def configure(settings: kopf.OperatorSettings, **_kwargs) -> None:
-    settings.posting.level = logging.INFO
+    # 12-factor config for the operator process itself (AGENTS.md section 3.7):
+    # LOG_LEVEL is the only env var it reads. Previously nothing read it at all, so the
+    # Deployment's `LOG_LEVEL` env var (and any ansible override of it) had no effect.
+    level_name = os.environ.get("LOG_LEVEL", "INFO").upper()
+    level = logging.getLevelName(level_name)
+    if not isinstance(level, int):
+        level = logging.INFO
+    logging.basicConfig(level=level)
+    settings.posting.level = level
     settings.persistence.finalizer = f"{GROUP}/finalizer"
     _dynamic_client()
 
@@ -81,7 +101,16 @@ def configure(settings: kopf.OperatorSettings, **_kwargs) -> None:
 @kopf.on.create(GROUP, VERSION, PLURAL)
 @kopf.on.update(GROUP, VERSION, PLURAL)
 @kopf.on.resume(GROUP, VERSION, PLURAL)
+@kopf.timer(GROUP, VERSION, PLURAL, interval=60)
 def reconcile(spec: dict, name: str, namespace: str, body: dict, patch: kopf.Patch, **_kwargs) -> None:
+    # Stacked with `@kopf.timer` (AGENTS.md section 3.6): on.create/update/resume alone
+    # computed `status.phase` exactly once, right after the apply, when the freshly
+    # created/updated Deployment has no `observedGeneration` yet -> phase stayed
+    # "Pending" forever (kopf does not re-run update handlers for status-only patches,
+    # and nothing else watched the child Deployment). The periodic timer re-applies the
+    # same desired state (so a child object deleted out-of-band, e.g. by an Argo CD
+    # migration, gets recreated) and recomputes the phase from the Deployment's current
+    # state every interval until it reflects reality.
     resolved = resolve_spec(dict(spec))
 
     existing_api_key = None

@@ -27,7 +27,10 @@ DEFAULT_OGX_IMAGE = (
 DEFAULTS: dict[str, Any] = {
     "image": DEFAULT_IMAGE,
     "ogxImage": DEFAULT_OGX_IMAGE,
-    "replicas": 1,
+    # No "replicas" default here on purpose: app/resources.py:build_deployment() omits
+    # `spec.replicas` entirely when it is unset so an external autoscaler (KEDA/HPA) can
+    # own the field. A default of 1 here (or in deploy/crd.yaml) always set the key and
+    # that branch never ran.
     "router": {
         "model": "auto",
         "tlsVerify": True,

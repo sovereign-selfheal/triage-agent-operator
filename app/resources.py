@@ -339,7 +339,15 @@ def build_deployment(name: str, spec: dict[str, Any]) -> dict[str, Any]:
                         {"name": "ogx-config", "configMap": {"name": ogx_config_name(name)}},
                         {
                             "name": "agent-knowledge",
-                            "configMap": {"name": resolved_knowledge_configmap_name(name, spec)},
+                            # `optional: true` because build_knowledge_configmap() returns
+                            # None (nothing created) when the CR gives neither `content`
+                            # nor `configMapName`: without this flag the pod stayed in
+                            # ContainerCreating forever waiting on a ConfigMap that will
+                            # never exist.
+                            "configMap": {
+                                "name": resolved_knowledge_configmap_name(name, spec),
+                                "optional": True,
+                            },
                         },
                         {"name": "ogx-data", "emptyDir": {}},
                     ],

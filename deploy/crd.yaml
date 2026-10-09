@@ -56,11 +56,10 @@ spec:
                 replicas:
                   type: integer
                   minimum: 0
-                  default: 1
                   description: >-
                     Omit (or set via a separate HPA/KEDA object) when autoscaling owns
-                    replica count; the operator only writes this field once on create
-                    if it is set, and leaves it alone on update when unset.
+                    replica count; the operator only writes this field when the CR sets
+                    it, and leaves it alone (no default) on every reconcile when unset.
                 router:
                   type: object
                   required:

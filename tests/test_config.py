@@ -6,7 +6,9 @@ def test_minimal_spec_gets_all_defaults():
 
     assert resolved["image"]
     assert resolved["ogxImage"]
-    assert resolved["replicas"] == 1
+    # No built-in default: omitting `replicas` lets an external autoscaler own it
+    # (app/resources.py:build_deployment skips the field entirely in that case).
+    assert "replicas" not in resolved
     assert resolved["router"]["url"] == "https://router.apps.example.com/v1"
     assert resolved["router"]["model"] == "auto"
     assert resolved["router"]["tlsVerify"] is True
@@ -34,7 +36,7 @@ def test_explicit_values_override_defaults():
 def test_none_values_do_not_override_defaults():
     resolved = resolve_spec({"router": {"url": "https://router.apps.example.com/v1"}, "replicas": None})
 
-    assert resolved["replicas"] == 1
+    assert "replicas" not in resolved
 
 
 def test_empty_spec_raises_key_error_for_required_router_url():
