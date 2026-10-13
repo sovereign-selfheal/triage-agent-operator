@@ -10,6 +10,7 @@ every time), and status reflects the real state of the child Deployment.
 from __future__ import annotations
 
 import base64
+from typing import Any
 import logging
 import os
 
@@ -17,6 +18,7 @@ import kopf
 from kubernetes import client
 from kubernetes import config as k8s_config
 from kubernetes.dynamic import DynamicClient
+from kubernetes.client.rest import ApiException
 from kubernetes.dynamic.exceptions import NotFoundError
 
 from app import resources
@@ -70,6 +72,19 @@ def _get(api_version: str, kind: str, namespace: str, name: str):
         return _api(api_version, kind).get(name=name, namespace=namespace)
     except NotFoundError:
         return None
+
+
+def _list_pods(namespace: str, label_selector: str) -> list[Any]:
+    try:
+        result = _api("v1", "Pod").get(namespace=namespace, label_selector=label_selector)
+    except (NotFoundError, ApiException) as exc:
+        logger.warning("Could not list pods in %s (%s): %s", namespace, label_selector, exc)
+        return []
+    items = getattr(result, "items", None)
+    if items is None:
+        body = result.to_dict() if hasattr(result, "to_dict") else result
+        items = (body or {}).get("items", [])
+    return list(items)
 
 
 def _existing_api_key(namespace: str, secret_name: str) -> str | None:
@@ -135,7 +150,8 @@ def reconcile(spec: dict, name: str, namespace: str, body: dict, patch: kopf.Pat
         logger.info("Applied %s/%s %s in %s", api_version, kind, manifest["metadata"]["name"], namespace)
 
     deployment = _get("apps/v1", "Deployment", namespace, name)
-    phase = phase_from_deployment(deployment)
+    pods = _list_pods(namespace, f"app={name}")
+    phase = phase_from_deployment(deployment, pods)
 
     route_url = ""
     if resolved["route"].get("enabled", True):

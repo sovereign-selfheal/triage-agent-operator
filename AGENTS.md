@@ -64,7 +64,9 @@ No `pyproject.toml` or installable package, same flat-module pattern as `triage-
    says. Changing *how* the agent behaves happens in the `triage-agent` repo, not here.
 6. **Status reflects real state.** `status.phase` follows the child Deployment's own
    availability (`Pending` until the Deployment exists and is observed, `Running` once
-   `status.availableReplicas >= 1`, `Degraded` otherwise). Do not report `Running` just
+   `status.availableReplicas >= 1`, `Degraded` when the Deployment hits
+   `ProgressDeadlineExceeded` or an owned Pod is in `CrashLoopBackOff` / `ImagePullBackOff`,
+   otherwise `Pending` while a rollout is still in progress). Do not report `Running` just
    because the reconcile loop didn't error.
 7. **12-factor config for the operator process itself.** `LOG_LEVEL` is the only env var the
    operator process reads; everything about a given agent instance comes from its CR, never
