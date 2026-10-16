@@ -24,7 +24,7 @@ spec:
     fileName: knowledge.md
     mountPath: /etc/triage-agent
     content: |
-      # Application Knowledge Base — quarkus-buggy-app
+      # Application Knowledge Base — payments-buggy-app
       See the gitops repo components/triage-agent/files/knowledge.md for the full text.
   namespaceHint: false
   route:
